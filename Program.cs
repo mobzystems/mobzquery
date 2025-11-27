@@ -18,7 +18,7 @@ rootCommand.SetAction(_ => ShowHelp());
 // Data source, SQL query and parameters (for all commands)
 var sourceArgument = new Argument<string>("source") { Description = "The data source. This is a file name when a type is specified, otherwise an OleDb connection string" };
 var sqlqueryArgument = new Argument<string>("sqlquery") { Description = "A SQL query" };
-var sqlparametersArgument = new Argument<string[]>("parameters") { Description = "Parameters for the SQL Query. Should appear in the SQL query as @1, @2, ...." };
+var sqlparametersArgument = new Argument<string[]>("parameters") { Description = "Parameters for the SQL query. Should appear in the query as @1, @2, ..." };
 
 // Common options
 var typeOption = new Option<string>("--type", "-t") { Description = "The data source type. If provided, the source is simply a file name (except for MySql)", Recursive = true };
@@ -39,12 +39,19 @@ infoCommand.Add(sqlparametersArgument);
 infoCommand.SetAction(pr => QueryDataSource(pr, "info"));
 rootCommand.Add((infoCommand));
 
-var tableCommand = new Command("table", "Query a data source and show contents in a table");
+var tableCommand = new Command("table", "Query a data source and show contents as a table");
 tableCommand.Add(sourceArgument);
 tableCommand.Add(sqlqueryArgument);
 tableCommand.Add(sqlparametersArgument);
 tableCommand.SetAction(pr => QueryDataSource(pr,"table"));
 rootCommand.Add((tableCommand));
+
+var jsonCommand = new Command("json", "Query a data source and show contents as JSON");
+jsonCommand.Add(sourceArgument);
+jsonCommand.Add(sqlqueryArgument);
+jsonCommand.Add(sqlparametersArgument);
+jsonCommand.SetAction(pr => QueryDataSource(pr,"json"));
+rootCommand.Add((jsonCommand));
 
 var csvCommand = new Command("csv", "Query a data source and show contents as CSV");
 csvCommand.SetAction(pr => QueryDataSource(pr, "csv"));
@@ -97,6 +104,20 @@ DbConnection TryCreateOleDbConnection(string source)
       throw new Exception($"Could not process the OleDd connection string. It should contain at least 'Provider='. Alternatively, specify --type and use a file name for the source.\r\nMessage was: {ex.Message}");
     }
   }
+}
+
+string JsonEscape(string s)
+{
+  return s
+    // Double backslashes
+    .Replace("\\", "\\\\")
+    // Replace "
+    .Replace("\"", "\\\"")  
+    // Replace \r
+    .Replace("\r", "\\r")  
+    // Replace \n
+    .Replace("\n", "\\n")
+  ;
 }
 
 async Task<int> QueryDataSource(ParseResult pr, string command)
@@ -208,16 +229,36 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
             {
               null => "<NULL",
               DateTime date => date.ToString("yyyy-MM-dd HH:mm:ss"),
-              string s when escape => $"\"{s}\"" // Surround with quotes
-                .Replace("\\", "\\\\") // Double backslashes
-                .Replace("\r", "\\r")  // Replace \r
-                .Replace("\n", "\\n"), // Replace \n
+              string s when escape => $"\"{JsonEscape(s)}\"", // Surround with quotes and escape
               string s when !escape => $"\"{s}\"", // Surround with quotes
               object o => o.ToString()
             })!;
           }
           Console.WriteLine(string.Join(",", values));
         }
+      }
+      else if (command == "json")
+      {
+        // Output JSON (sort of)
+        Console.WriteLine("[");
+        foreach (var row in result)
+        {
+          Console.WriteLine("  {");
+          for (int i = 0; i < result.ColumnNames.Length; i++)
+          {
+            var name = result.ColumnNames[i];
+            var value = (row[i] switch
+            {
+              null => "null",
+              DateTime date => $"\"{date.ToString("yyyy-MM-dd HH:mm:ss")}\"",
+              string s => $"\"{JsonEscape(s)}\"", // Surround with quotes and escape
+              object o => o.ToString()
+            })!;
+            Console.WriteLine($"    \"{name}\": {value},");
+          }
+          Console.WriteLine("  },");
+        }
+        Console.WriteLine("]");
       }
       else
       {
@@ -230,7 +271,7 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
 
   catch (Exception ex)
   {
-    AnsiConsole.MarkupInterpolated($"[red]Error executing 'query': {ex.Message}[/]");
+    AnsiConsole.MarkupInterpolated($"[red]Error executing '{command}': {ex.Message}[/]");
     return 1;
   }
 }
