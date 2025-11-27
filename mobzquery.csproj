@@ -10,6 +10,7 @@
     <PublishTrimmed>false</PublishTrimmed>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <Version>0.9.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <!--
       <PublishAot>False</PublishAot>
     -->

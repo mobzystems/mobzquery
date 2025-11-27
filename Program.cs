@@ -1,7 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using Google.Protobuf.WellKnownTypes;
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using MySql.Data.MySqlClient;
 using Spectre.Console;
 using Spectre.Console.Rendering;
@@ -10,9 +7,8 @@ using System.Data;
 using System.Data.Common;
 using System.Data.OleDb;
 using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
 
-var rootCommand = new RootCommand("Query data sources using OleDB");
+var rootCommand = new RootCommand("Query OleDb, MySql and Sqlite data sources");
 rootCommand.SetAction(_ => ShowHelp());
 
 // Data source, SQL query and parameters (for all commands)
@@ -259,11 +255,17 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
           Console.WriteLine("  },");
         }
         Console.WriteLine("]");
+        
       }
       else
       {
-        throw new Exception($"Unknow opration: '{command}");
+        throw new Exception($"Unknown command: '{command}");
       }
+
+      // Dispose explicitly so we can report it
+      dataConnection.Dispose();
+      if (verbose)
+        AnsiConsole.MarkupLine("[green]Connection closed[/]");
 
       return 0;
     }
