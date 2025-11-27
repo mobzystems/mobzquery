@@ -46,14 +46,6 @@ tableCommand.Add(sqlparametersArgument);
 tableCommand.SetAction(pr => QueryDataSource(pr,"table"));
 rootCommand.Add((tableCommand));
 
-var scalarCommand = new Command("scalar", "Query a data source for a single value");
-// scalarCommand.Aliases = ["single"];
-scalarCommand.Add(sourceArgument);
-scalarCommand.Add(sqlqueryArgument);
-scalarCommand.Add(sqlparametersArgument);
-scalarCommand.SetAction(pr => QueryDataSource(pr,"scalar"));
-rootCommand.Add((scalarCommand));
-
 var csvCommand = new Command("csv", "Query a data source and show contents as CSV");
 csvCommand.SetAction(pr => QueryDataSource(pr, "csv"));
 csvCommand.Add(sourceArgument);
@@ -62,6 +54,14 @@ csvCommand.Add(sqlparametersArgument);
 // Extra option for csv
 csvCommand.Add(escapeOption);
 rootCommand.Add((csvCommand));
+
+var scalarCommand = new Command("scalar", "Query a data source for a single value");
+// scalarCommand.Aliases = ["single"];
+scalarCommand.Add(sourceArgument);
+scalarCommand.Add(sqlqueryArgument);
+scalarCommand.Add(sqlparametersArgument);
+scalarCommand.SetAction(pr => QueryDataSource(pr, "scalar"));
+rootCommand.Add((scalarCommand));
 
 try
 {
@@ -150,7 +150,7 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
         foreach (string columnName in result.ColumnNames)
         {
           var column = result.Column(columnName);
-          columnTable.AddRow(column.Index.ToString(), column.Name, column.DataType.Name);
+          columnTable.AddRow(column.Index.ToString(), Markup.Escape(column.Name), column.DataType.Name);
         }
         AnsiConsole.Write(columnTable);
       }
@@ -178,7 +178,7 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
         // Output a table
         Table dataTable = new Table();
         dataTable.Collapse();
-        dataTable.AddColumns(result.ColumnNames);
+        dataTable.AddColumns(result.ColumnNames.Select(n => Markup.Escape(n)).ToArray());
         var values = new IRenderable[result.ColumnNames.Length];
 
         foreach (var row in result)
