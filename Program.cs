@@ -28,19 +28,42 @@ var outputOption = new Option<string>("--output", "-o") { Description = "The out
 outputOption.AcceptOnlyFromAmong("table", "csv");
 var escapeOption = new Option<bool>("--escape", "-e") { Description = "Escape backslashes and \\r and \\n in strings" };
 
-var queryCommand = new Command("query", "Query a data source and display the results");
-queryCommand.SetAction(pr => QueryDataSource(pr));
-queryCommand.Add(sourceArgument);
-queryCommand.Add(sqlqueryArgument);
-queryCommand.Add(sqlparametersArgument);
-queryCommand.Add(infoOption);
-queryCommand.Add(typeOption);
-queryCommand.Add(verboseOption);
-queryCommand.Add(scalarOption);
-queryCommand.Add(outputOption);
-queryCommand.Add(escapeOption);
+var infoCommand = new Command("info", "Show column information about a query");
+infoCommand.SetAction(pr => QueryDataSource(pr, "info"));
 
-rootCommand.Add((queryCommand));
+infoCommand.Add(sourceArgument);
+infoCommand.Add(sqlqueryArgument);
+infoCommand.Add(sqlparametersArgument);
+infoCommand.Add(typeOption);
+infoCommand.Add(verboseOption);
+infoCommand.Add(scalarOption);
+
+rootCommand.Add((infoCommand));
+
+var tableCommand = new Command("table", "Query a data source and show contents in a table");
+tableCommand.SetAction(pr => QueryDataSource(pr,"table"));
+
+tableCommand.Add(sourceArgument);
+tableCommand.Add(sqlqueryArgument);
+tableCommand.Add(sqlparametersArgument);
+tableCommand.Add(typeOption);
+tableCommand.Add(verboseOption);
+tableCommand.Add(scalarOption);
+
+rootCommand.Add((tableCommand));
+
+var csvCommand = new Command("csv", "Query a data source and show contents as CSV");
+csvCommand.SetAction(pr => QueryDataSource(pr, "csv"));
+
+csvCommand.Add(sourceArgument);
+csvCommand.Add(sqlqueryArgument);
+csvCommand.Add(sqlparametersArgument);
+csvCommand.Add(typeOption);
+csvCommand.Add(verboseOption);
+csvCommand.Add(scalarOption);
+csvCommand.Add(escapeOption);
+
+rootCommand.Add((csvCommand));
 
 try
 {
@@ -51,7 +74,6 @@ try
 }
 catch (Exception ex)
 {
-  // Console.Error.WriteLine($"{ex.Message}");
   AnsiConsole.MarkupInterpolated($"[red]{ex.Message}[/]");
 }
 
@@ -61,8 +83,6 @@ int ShowHelp()
 
   AnsiConsole.MarkupLineInterpolated($"mobzquery v[green]{version?.ToString(3) ?? "???"}[/] by [green]MOBZystems[/] - [link]https://www.mobzystems.com[/] ({(Environment.Is64BitProcess ? "x64" : "x86")})");
   AnsiConsole.WriteLine();
-  // AnsiConsole.MarkupLineInterpolated($"Use [blue]mobzquery --help[/] for help.");
-  // Console.WriteLine(rootCommand.Invoke());
   rootCommand.Parse("--help").Invoke();
   return 0;
 }
@@ -81,19 +101,20 @@ DbConnection TryCreateOleDbConnection(string source)
   }
 }
 
-async Task<int> QueryDataSource(ParseResult pr)
+async Task<int> QueryDataSource(ParseResult pr, string operation)
 {
   try
   {
+    // For all operations: the data source with options
     var source = pr.GetRequiredValue<string>("source");
     var query = pr.GetRequiredValue<string>("sqlquery");
     var parameters = pr.GetValue<string[]>("parameters");
-    var info = pr.GetRequiredValue<bool>("--info");
     var type = pr.GetValue<string>("--type");
     var verbose = pr.GetValue<bool>("--verbose");
     var scalar = pr.GetValue<bool>("--scalar");
-    var output = pr.GetValue<string>("--output") ?? "table";
-    var escape = pr.GetRequiredValue<bool>("--escape");
+
+    // For csv only
+    var escape = operation == "csv" ? pr.GetRequiredValue<bool>("--escape") : false;
 
     DbConnection connection = type switch
     {
@@ -117,7 +138,7 @@ async Task<int> QueryDataSource(ParseResult pr)
 
       var result = await dataConnection.SelectAsync(query, sqlParameters);
       var rowCount = result.Count();
-      if (info)
+      if (operation == "info")
       {
         Table columnTable = new Table();
         columnTable.AddColumns("Index", "Name", "Type");
@@ -145,7 +166,7 @@ async Task<int> QueryDataSource(ParseResult pr)
         else
           AnsiConsole.MarkupLineInterpolated($"{value}");
       }
-      else if (output == "table")
+      else if (operation == "table")
       {
         if (escape)
           AnsiConsole.MarkupLineInterpolated($"[yellow]--escape ignored, applies only to --output csv[/]");
@@ -171,7 +192,7 @@ async Task<int> QueryDataSource(ParseResult pr)
           AnsiConsole.MarkupLineInterpolated($"[green]{count} row(s)[/]");
         }
       }
-      else if (output == "csv")
+      else if (operation == "csv")
       {
         Console.WriteLine(string.Join(",", result.ColumnNames.Select(name => $"\"{name}\"")));
         var values = new string[result.ColumnNames.Length];
@@ -196,7 +217,7 @@ async Task<int> QueryDataSource(ParseResult pr)
       }
       else
       {
-        throw new Exception($"Unknow value for --output: '{output}");
+        throw new Exception($"Unknow opration: '{operation}");
       }
 
       return 0;
