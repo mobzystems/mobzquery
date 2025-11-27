@@ -1,15 +1,16 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using Spectre.Console;
-using System.CommandLine;
-using System.Data.OleDb;
-using System.Data.Common;
+using Google.Protobuf.WellKnownTypes;
 using Microsoft.Data.Sqlite;
-using System.Data;
-using Spectre.Console.Rendering;
-using System.Reflection.Metadata.Ecma335;
-using System.Reflection;
 using MySql.Data.MySqlClient;
+using Spectre.Console;
+using Spectre.Console.Rendering;
+using System.CommandLine;
+using System.Data;
+using System.Data.Common;
+using System.Data.OleDb;
+using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
 
 var rootCommand = new RootCommand("Query data sources using OleDB");
 rootCommand.SetAction(_ => ShowHelp());
@@ -19,10 +20,13 @@ var sqlqueryArgument = new Argument<string>("sqlquery") { Description = "A SQL q
 var sqlparametersArgument = new Argument<string[]>("parameters") { Description = "Parameters for the SQL Query. Should appear in the SQL query as @1, @2, ...." };
 
 var infoOption = new Option<bool>("--info", "-i") { Description = "Show column info" };
-var typeOption = new Option<string>("--type", "-t") { Description = "The data source type. If provided, the source is simply a file name" };
+var typeOption = new Option<string>("--type", "-t") { Description = "The data source type. If provided, the source is simply a file name (except for MySql)" };
 typeOption.AcceptOnlyFromAmong("sqlite", "mysql", "ace", "jet");
 var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Show detailed output" };
 var scalarOption = new Option<bool>("--scalar", "-s", "--single") { Description = "Expect and output only a single value" };
+var outputOption = new Option<string>("--output", "-o") { Description = "The output type. Defaults to 'table', i.e. a table on the console." };
+outputOption.AcceptOnlyFromAmong("table", "csv");
+var escapeOption = new Option<bool>("--escape", "-e") { Description = "Escape backslashes and \\r and \\n in strings" };
 
 var queryCommand = new Command("query", "Query a data source and display the results");
 queryCommand.SetAction(pr => QueryDataSource(pr));
@@ -33,6 +37,8 @@ queryCommand.Add(infoOption);
 queryCommand.Add(typeOption);
 queryCommand.Add(verboseOption);
 queryCommand.Add(scalarOption);
+queryCommand.Add(outputOption);
+queryCommand.Add(escapeOption);
 
 rootCommand.Add((queryCommand));
 
@@ -86,6 +92,8 @@ async Task<int> QueryDataSource(ParseResult pr)
     var type = pr.GetValue<string>("--type");
     var verbose = pr.GetValue<bool>("--verbose");
     var scalar = pr.GetValue<bool>("--scalar");
+    var output = pr.GetValue<string>("--output") ?? "table";
+    var escape = pr.GetRequiredValue<bool>("--escape");
 
     DbConnection connection = type switch
     {
@@ -137,8 +145,11 @@ async Task<int> QueryDataSource(ParseResult pr)
         else
           AnsiConsole.MarkupLineInterpolated($"{value}");
       }
-      else
+      else if (output == "table")
       {
+        if (escape)
+          AnsiConsole.MarkupLineInterpolated($"[yellow]--escape ignored, applies only to --output csv[/]");
+
         Table dataTable = new Table();
         dataTable.Collapse();
         dataTable.AddColumns(result.ColumnNames);
@@ -160,9 +171,36 @@ async Task<int> QueryDataSource(ParseResult pr)
           AnsiConsole.MarkupLineInterpolated($"[green]{count} row(s)[/]");
         }
       }
-    }
+      else if (output == "csv")
+      {
+        Console.WriteLine(string.Join(",", result.ColumnNames.Select(name => $"\"{name}\"")));
+        var values = new string[result.ColumnNames.Length];
+        foreach (var row in result)
+        {
+          for (int i = 0; i < result.ColumnNames.Length; i++)
+          {
+            values[i] = row[i] switch
+            {
+              null => "<NULL",
+              DateTime date => date.ToString("yyyy-MM-dd HH:mm:ss"),
+              string s when escape => $"\"{s}\"" // Surround with quotes
+                .Replace("\\", "\\\\") // Double backslashes
+                .Replace("\r", "\\r")  // Replace \r
+                .Replace("\n", "\\n"), // Replace \n
+              string s when !escape => $"\"{s}\"", // Surround with quotes
+              object o => o.ToString()
+            };
+          }
+          Console.WriteLine(string.Join(",", values));
+        }
+      }
+      else
+      {
+        throw new Exception($"Unknow value for --output: '{output}");
+      }
 
-    return 0;
+      return 0;
+    }
   }
 
   catch (Exception ex)
