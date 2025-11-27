@@ -15,54 +15,52 @@ using System.Reflection.Metadata.Ecma335;
 var rootCommand = new RootCommand("Query data sources using OleDB");
 rootCommand.SetAction(_ => ShowHelp());
 
+// Data source, SQL query and parameters (for all commands)
 var sourceArgument = new Argument<string>("source") { Description = "The data source. This is a file name when a type is specified, otherwise an OleDb connection string" };
 var sqlqueryArgument = new Argument<string>("sqlquery") { Description = "A SQL query" };
 var sqlparametersArgument = new Argument<string[]>("parameters") { Description = "Parameters for the SQL Query. Should appear in the SQL query as @1, @2, ...." };
 
-var infoOption = new Option<bool>("--info", "-i") { Description = "Show column info" };
-var typeOption = new Option<string>("--type", "-t") { Description = "The data source type. If provided, the source is simply a file name (except for MySql)" };
+// Common options
+var typeOption = new Option<string>("--type", "-t") { Description = "The data source type. If provided, the source is simply a file name (except for MySql)", Recursive = true };
 typeOption.AcceptOnlyFromAmong("sqlite", "mysql", "ace", "jet");
-var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Show detailed output" };
-var scalarOption = new Option<bool>("--scalar", "-s", "--single") { Description = "Expect and output only a single value" };
-var outputOption = new Option<string>("--output", "-o") { Description = "The output type. Defaults to 'table', i.e. a table on the console." };
-outputOption.AcceptOnlyFromAmong("table", "csv");
+var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Show detailed output", Recursive = true };
+
+// csv only:
 var escapeOption = new Option<bool>("--escape", "-e") { Description = "Escape backslashes and \\r and \\n in strings" };
 
-var infoCommand = new Command("info", "Show column information about a query");
-infoCommand.SetAction(pr => QueryDataSource(pr, "info"));
+// Add default options for all commands
+rootCommand.Add(typeOption);
+rootCommand.Add(verboseOption);
 
+var infoCommand = new Command("info", "Show column information about a query");
 infoCommand.Add(sourceArgument);
 infoCommand.Add(sqlqueryArgument);
 infoCommand.Add(sqlparametersArgument);
-infoCommand.Add(typeOption);
-infoCommand.Add(verboseOption);
-infoCommand.Add(scalarOption);
-
+infoCommand.SetAction(pr => QueryDataSource(pr, "info"));
 rootCommand.Add((infoCommand));
 
 var tableCommand = new Command("table", "Query a data source and show contents in a table");
-tableCommand.SetAction(pr => QueryDataSource(pr,"table"));
-
 tableCommand.Add(sourceArgument);
 tableCommand.Add(sqlqueryArgument);
 tableCommand.Add(sqlparametersArgument);
-tableCommand.Add(typeOption);
-tableCommand.Add(verboseOption);
-tableCommand.Add(scalarOption);
-
+tableCommand.SetAction(pr => QueryDataSource(pr,"table"));
 rootCommand.Add((tableCommand));
+
+var scalarCommand = new Command("scalar", "Query a data source for a single value");
+// scalarCommand.Aliases = ["single"];
+scalarCommand.Add(sourceArgument);
+scalarCommand.Add(sqlqueryArgument);
+scalarCommand.Add(sqlparametersArgument);
+scalarCommand.SetAction(pr => QueryDataSource(pr,"scalar"));
+rootCommand.Add((scalarCommand));
 
 var csvCommand = new Command("csv", "Query a data source and show contents as CSV");
 csvCommand.SetAction(pr => QueryDataSource(pr, "csv"));
-
 csvCommand.Add(sourceArgument);
 csvCommand.Add(sqlqueryArgument);
 csvCommand.Add(sqlparametersArgument);
-csvCommand.Add(typeOption);
-csvCommand.Add(verboseOption);
-csvCommand.Add(scalarOption);
+// Extra option for csv
 csvCommand.Add(escapeOption);
-
 rootCommand.Add((csvCommand));
 
 try
@@ -101,21 +99,22 @@ DbConnection TryCreateOleDbConnection(string source)
   }
 }
 
-async Task<int> QueryDataSource(ParseResult pr, string operation)
+async Task<int> QueryDataSource(ParseResult pr, string command)
 {
   try
   {
-    // For all operations: the data source with options
+    // For all command: the data source arguments
     var source = pr.GetRequiredValue<string>("source");
     var query = pr.GetRequiredValue<string>("sqlquery");
     var parameters = pr.GetValue<string[]>("parameters");
+    /// ... and the recursive options
     var type = pr.GetValue<string>("--type");
     var verbose = pr.GetValue<bool>("--verbose");
-    var scalar = pr.GetValue<bool>("--scalar");
 
     // For csv only
-    var escape = operation == "csv" ? pr.GetRequiredValue<bool>("--escape") : false;
+    var escape = command == "csv" ? pr.GetRequiredValue<bool>("--escape") : false;
 
+    // Create a DbConnection
     DbConnection connection = type switch
     {
       "jet" => new OleDbConnection($"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={source}"),
@@ -134,12 +133,18 @@ async Task<int> QueryDataSource(ParseResult pr, string operation)
       if (verbose)
         AnsiConsole.MarkupLineInterpolated($"[green]Connection opened[/]");
 
+      // Build a parameter-array
       var sqlParameters = parameters == null ? [] : parameters.Select((p, index) => ((index + 1).ToString(), p as object)).ToArray();
 
+      // Query the data source
       var result = await dataConnection.SelectAsync(query, sqlParameters);
+      // Get the row count
       var rowCount = result.Count();
-      if (operation == "info")
+
+      // Do the work for each command
+      if (command == "info")
       {
+        // info command
         Table columnTable = new Table();
         columnTable.AddColumns("Index", "Name", "Type");
         foreach (string columnName in result.ColumnNames)
@@ -151,11 +156,13 @@ async Task<int> QueryDataSource(ParseResult pr, string operation)
       }
       else if (rowCount == 0)
       {
+        // All other commands without any output
         if (verbose)
           AnsiConsole.MarkupLineInterpolated($"[green]Query returned 0 rows[/]");
       }
-      else if (scalar)
+      else if (command == "scalar" )
       {
+        // Just one value
         if (rowCount != 1)
           throw new Exception($"Query returned {rowCount} rows, expected 1");
         if (result.ColumnNames.Length != 1)
@@ -166,11 +173,9 @@ async Task<int> QueryDataSource(ParseResult pr, string operation)
         else
           AnsiConsole.MarkupLineInterpolated($"{value}");
       }
-      else if (operation == "table")
+      else if (command == "table")
       {
-        if (escape)
-          AnsiConsole.MarkupLineInterpolated($"[yellow]--escape ignored, applies only to --output csv[/]");
-
+        // Output a table
         Table dataTable = new Table();
         dataTable.Collapse();
         dataTable.AddColumns(result.ColumnNames);
@@ -179,9 +184,7 @@ async Task<int> QueryDataSource(ParseResult pr, string operation)
         foreach (var row in result)
         {
           for (int i = 0; i < result.ColumnNames.Length; i++)
-          {
             values[i] = row[i] != null ? new Markup(Markup.Escape(row[i].ToString()!)) : new Markup("[red]<NULL>[/]");
-          }
           dataTable.AddRow(values);
         }
         AnsiConsole.Write(dataTable);
@@ -192,15 +195,16 @@ async Task<int> QueryDataSource(ParseResult pr, string operation)
           AnsiConsole.MarkupLineInterpolated($"[green]{count} row(s)[/]");
         }
       }
-      else if (operation == "csv")
+      else if (command == "csv")
       {
+        // Output CSV
         Console.WriteLine(string.Join(",", result.ColumnNames.Select(name => $"\"{name}\"")));
         var values = new string[result.ColumnNames.Length];
         foreach (var row in result)
         {
           for (int i = 0; i < result.ColumnNames.Length; i++)
           {
-            values[i] = row[i] switch
+            values[i] = (row[i] switch
             {
               null => "<NULL",
               DateTime date => date.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -210,14 +214,14 @@ async Task<int> QueryDataSource(ParseResult pr, string operation)
                 .Replace("\n", "\\n"), // Replace \n
               string s when !escape => $"\"{s}\"", // Surround with quotes
               object o => o.ToString()
-            };
+            })!;
           }
           Console.WriteLine(string.Join(",", values));
         }
       }
       else
       {
-        throw new Exception($"Unknow opration: '{operation}");
+        throw new Exception($"Unknow opration: '{command}");
       }
 
       return 0;
