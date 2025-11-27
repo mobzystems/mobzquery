@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "mobzquery": {
+      "commandName": "Project",
+      "commandLineArgs": "query \"Provider=Microsoft.Jet.OLEDB.4.0;Data Source=D:\\test.mdb;\" \"select * from werkgever\""
+    }
+  }
+}
