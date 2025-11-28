@@ -69,6 +69,7 @@ After the data source, a SQL query must be specified, e.g. "select * from Genres
 
 Here, parameter @1 gets the value 5 and @2 the value 10, displaying all rows with and Id between 5 and 10:
 
+```
 ┌─────────┬───────────────┐
 │ GenreId │ Name          │
 ├─────────┼───────────────┤
@@ -79,6 +80,7 @@ Here, parameter @1 gets the value 5 and @2 the value 10, displaying all rows wit
 │ 9       │ Pop           │
 │ 10      │ Soundtrack    │
 └─────────┴───────────────┘
+```
 
 ### Info
 
@@ -86,12 +88,14 @@ The info command queries the data source (getting **all** records so be sure to 
 
     mobzquery info --type sqlite "d:\chinook.db" "select * from Genres where 0=1"
 
+```
 ┌───────┬─────────┬────────┐
 │ Index │ Name    │ Type   │
 ├───────┼─────────┼────────┤
 │ 0     │ GenreId │ Int64  │
 │ 1     │ Name    │ String │
 └───────┴─────────┴────────┘
+```
 
 (The 0=1 filter makes sure we don't actually return any rows and we don't need parameters anymore)
 
