@@ -7,6 +7,7 @@ using System.Data;
 using System.Data.Common;
 using System.Data.OleDb;
 using System.Reflection;
+using System.Reflection.PortableExecutable;
 
 var rootCommand = new RootCommand("Query OleDb, MySql and Sqlite data sources");
 rootCommand.SetAction(_ => ShowHelp());
@@ -82,7 +83,7 @@ int ShowHelp()
 {
   var version = Assembly.GetEntryAssembly()?.GetName().Version;
 
-  AnsiConsole.MarkupLineInterpolated($"mobzquery v[green]{version?.ToString(3) ?? "???"}[/] by [green]MOBZystems[/] - [link]https://www.mobzystems.com[/] ({(Environment.Is64BitProcess ? "x64" : "x86")})");
+  AnsiConsole.MarkupLineInterpolated($"mobzquery v[green]{version?.ToString(3) ?? "???"}[/] by [green]MOBZystems[/] - [link]https://www.mobzystems.com[/] ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLower()})");
   AnsiConsole.WriteLine();
   rootCommand.Parse("--help").Invoke();
   return 0;

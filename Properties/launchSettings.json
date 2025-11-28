@@ -1,8 +1,7 @@
 {
   "profiles": {
     "mobzquery": {
-      "commandName": "Project",
-      "commandLineArgs": "scalar D:\\chinook.db \"select * from Genres where GenreId>@1 order by Name\" 5 --type sqlite"
+      "commandName": "Project"
     }
   }
 }
