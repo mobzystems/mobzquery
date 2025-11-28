@@ -6,8 +6,10 @@ using System.CommandLine;
 using System.Data;
 using System.Data.Common;
 using System.Data.OleDb;
+using System.Net.Http.Json;
 using System.Reflection;
-using System.Reflection.PortableExecutable;
+
+var appVersion = Assembly.GetEntryAssembly()?.GetName().Version;
 
 var rootCommand = new RootCommand("Query OleDb, MySql and Sqlite data sources");
 rootCommand.SetAction(_ => ShowHelp());
@@ -40,14 +42,14 @@ var tableCommand = new Command("table", "Query a data source and show contents a
 tableCommand.Add(sourceArgument);
 tableCommand.Add(sqlqueryArgument);
 tableCommand.Add(sqlparametersArgument);
-tableCommand.SetAction(pr => QueryDataSource(pr,"table"));
+tableCommand.SetAction(pr => QueryDataSource(pr, "table"));
 rootCommand.Add((tableCommand));
 
 var jsonCommand = new Command("json", "Query a data source and show contents as JSON");
 jsonCommand.Add(sourceArgument);
 jsonCommand.Add(sqlqueryArgument);
 jsonCommand.Add(sqlparametersArgument);
-jsonCommand.SetAction(pr => QueryDataSource(pr,"json"));
+jsonCommand.SetAction(pr => QueryDataSource(pr, "json"));
 rootCommand.Add((jsonCommand));
 
 var csvCommand = new Command("csv", "Query a data source and show contents as CSV");
@@ -67,6 +69,10 @@ scalarCommand.Add(sqlparametersArgument);
 scalarCommand.SetAction(pr => QueryDataSource(pr, "scalar"));
 rootCommand.Add((scalarCommand));
 
+var updateCommand = new Command("update", "Check for updates");
+updateCommand.SetAction(async pr => await CheckForUpdates(pr));
+rootCommand.Add(updateCommand);
+
 try
 {
   var parseResult = rootCommand.Parse(args);
@@ -81,9 +87,7 @@ catch (Exception ex)
 
 int ShowHelp()
 {
-  var version = Assembly.GetEntryAssembly()?.GetName().Version;
-
-  AnsiConsole.MarkupLineInterpolated($"mobzquery v[green]{version?.ToString(3) ?? "???"}[/] by [green]MOBZystems[/] - [link]https://www.mobzystems.com[/] ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLower()})");
+  AnsiConsole.MarkupLineInterpolated($"mobzquery v[green]{appVersion?.ToString(3) ?? "???"}[/] by [green]MOBZystems[/] - [link]https://www.mobzystems.com[/] ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLower()})");
   AnsiConsole.WriteLine();
   rootCommand.Parse("--help").Invoke();
   return 0;
@@ -109,9 +113,9 @@ string JsonEscape(string s)
     // Double backslashes
     .Replace("\\", "\\\\")
     // Replace "
-    .Replace("\"", "\\\"")  
+    .Replace("\"", "\\\"")
     // Replace \r
-    .Replace("\r", "\\r")  
+    .Replace("\r", "\\r")
     // Replace \n
     .Replace("\n", "\\n")
   ;
@@ -178,7 +182,7 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
         if (verbose)
           AnsiConsole.MarkupLineInterpolated($"[green]Query returned 0 rows[/]");
       }
-      else if (command == "scalar" )
+      else if (command == "scalar")
       {
         // Just one value
         if (rowCount != 1)
@@ -256,7 +260,7 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
           Console.WriteLine("  },");
         }
         Console.WriteLine("]");
-        
+
       }
       else
       {
@@ -276,5 +280,28 @@ async Task<int> QueryDataSource(ParseResult pr, string command)
   {
     AnsiConsole.MarkupInterpolated($"[red]Error executing '{command}': {ex.Message}[/]");
     return 1;
+  }
+}
+
+async Task CheckForUpdates(ParseResult pr)
+{
+  var verbose = pr.GetValue<bool>("--verbose");
+  try
+  {
+    var client = new HttpClient();
+    var versionString = await client.GetFromJsonAsync<string>($"https://www.mobzystems.com/api/toolversion?t=mobzquery") ?? "";
+    if (versionString != "")
+    {
+      var newVersion = new Version(versionString);
+      if (newVersion > appVersion)
+        AnsiConsole.MarkupInterpolated($"A new version [green]{newVersion.ToString(3)}[/] of mobzquery is available. Download it at [link]https://www.mobzystems.com/tools/mobzquery[/]");
+      else
+        AnsiConsole.MarkupInterpolated($"The most recent version of mobzquery is [yellow]{newVersion.ToString(3)}[/].");
+    } else
+      AnsiConsole.MarkupInterpolated($"[red]No version information for mobzquery available[/]");
+  }
+  catch (Exception ex)
+  {
+    throw new Exception($"Could not check for updates: {ex.Message}");
   }
 }

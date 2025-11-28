@@ -27,6 +27,7 @@ Commands:
   json <source> <sqlquery> <parameters>    Query a data source and show contents as JSON
   csv <source> <sqlquery> <parameters>     Query a data source and show contents as CSV
   scalar <source> <sqlquery> <parameters>  Query a data source for a single value
+  update                                   Check for updates
 ```
 
 In other words, MOBZQuery supports the following commands:
@@ -36,6 +37,8 @@ In other words, MOBZQuery supports the following commands:
 - json
 - csv
 - scalar
+
+(Plus 'update' which checks for updates)
 
 All expect three arguments: the data source to query, the query to execute and optional parameters for the quuery.
 

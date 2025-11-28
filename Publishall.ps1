@@ -17,6 +17,7 @@ foreach ($mode in $modes) {
 		dotnet publish mobzquery.csproj /p:PublishProfile=$mode-win-$runtime
 		# Create zip-file:
 		Write-Output "Compressing $runtime ($mode)..."
-		Compress-Archive ".\publish\net10.0-windows\$mode\win-$runtime" ".\publish\mobzquery.$versionString-$runtime-$($mode.ToLower()).zip" -CompressionLevel Optimal -Force
+		Compress-Archive ".\publish\net10.0-windows\$mode\win-$runtime" ".\publish\net10.0-windows\mobzquery.$versionString-$runtime-$($mode.ToLower()).zip" -CompressionLevel Optimal -Force
+		Write-Output "Created publish\net10.0-windows\mobzquery.$versionString-$runtime-$($mode.ToLower()).zip"
 	}
 }
