@@ -1,5 +1,5 @@
-# This script publishes tha project into .\publish\net10.0-windows for x86, x64 and arm64
-# and both self-contained and framework-dependent, and makes zip files for each
+# This script publishes thaeproject into .\publish\net10.0-windows for x86, x64 and arm64,
+# both self-contained and framework-dependent, and makes zip files for each
 
 $proj = [xml](Get-Content .\mobzquery.csproj)
 $version = [System.Version]::new($proj.Project.PropertyGroup.Version)
@@ -13,11 +13,11 @@ $runtimes = @('x86', 'x64', 'arm64')
 foreach ($mode in $modes) {
 	foreach ($runtime in $runtimes) {
 		# Build the version:
-		Write-Output "Building $runtime ($mode)..."
+		Write-Output "--- Building $runtime ($mode)..."
 		dotnet publish mobzquery.csproj /p:PublishProfile=$mode-win-$runtime
 		# Create zip-file:
 		Write-Output "Compressing $runtime ($mode)..."
 		Compress-Archive ".\publish\net10.0-windows\$mode\win-$runtime" ".\publish\net10.0-windows\mobzquery.$versionString-$runtime-$($mode.ToLower()).zip" -CompressionLevel Optimal -Force
-		Write-Output "Created publish\net10.0-windows\mobzquery.$versionString-$runtime-$($mode.ToLower()).zip"
+		Write-Output "--- Created .\publish\net10.0-windows\mobzquery.$versionString-$runtime-$($mode.ToLower()).zip`r`n"
 	}
 }
