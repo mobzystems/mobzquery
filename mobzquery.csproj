@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net11.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -10,7 +10,7 @@
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>true</PublishSingleFile>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <Version>0.9.0</Version>
+    <Version>0.9.1</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <!--
       <PublishAot>False</PublishAot>
@@ -22,12 +22,14 @@
     <PackageReference Include="MOBZystems.Data" Version="0.8.1" />
     <PackageReference Include="MySql.Data" Version="9.5.0" />
     <PackageReference Include="Spectre.Console" Version="0.54.0" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
     <PackageReference Include="System.CommandLine" Version="2.0.0" />
     <PackageReference Include="System.Data.OleDb" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="publish\net10.0-windows\" />
+    <Folder Include="publish\net11.0-windows\" />
   </ItemGroup>
 
 </Project>
